@@ -1,0 +1,24 @@
+# 构建产物
+bin/
+/outlook-manager
+web/dist/
+*.tar.gz
+
+# 前端依赖
+web/node_modules/
+
+# 运行时数据（数据库 / 日志 / 初始密码备份，绝不上库）
+data/
+*.db
+*.db-shm
+*.db-wal
+*.log
+
+# 本地配置（含代理等机器相关设置；首次运行自动生成，参考 config.example.yaml）
+configs/config.yaml
+
+# 系统
+.DS_Store
+
+# TS 增量编译缓存
+*.tsbuildinfo

@@ -1,0 +1,274 @@
+/* ============================================================
+   Outlook Manager — 自研设计系统
+   方向：瑞士国际主义排版 × 终端控制台美学
+   近黑画布 / 酸性绿 / 细线网格 / 等宽数据 / 物理感动效
+   ============================================================ */
+
+:root {
+  /* ---- 与主题无关的共享变量 ---- */
+  /* 注意：品牌强调色 --acid 按主题分别定义（见下），
+     深色用柔翡翠、浅色用深翡翠，避免荧光绿刺眼 / 浅底对比度不足。 */
+
+  /* 字体 */
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  /* 动效曲线 */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --dur: 0.35s;
+
+  /* 结构 */
+  --nav-w: 240px;
+  --radius: 4px;
+
+  /* 主题切换过渡 */
+  --theme-dur: 0.4s;
+}
+
+/* ============================================================
+   深色主题（默认）—— 近黑画布 / 酸性绿 / 细线网格
+   ============================================================ */
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #08090c;
+  --bg-raised: #0d0f13;
+  --bg-overlay: #13161c;
+  --bg-hover: #181c23;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.16);
+
+  --text: #e9ebef;
+  --text-dim: #98a0ac;
+  --text-faint: #59606c;
+
+  /* 品牌强调色：柔和翡翠绿（替换原荧光黄绿 #c8f542，大幅降低眩光） */
+  --acid: #6ee7b7;
+  --acid-ink: #06231a;
+  --acid-glow: rgba(110, 231, 183, 0.12);
+
+  --ok: #3ddc84;
+  --bad: #ff5470;
+  --warn: #ffb224;
+  --info: #7a8194;
+
+  /* 中性色（用于图标/装饰，需随主题反色的地方引用它，勿写死 #e9ebef） */
+  --neutral: #e9ebef;
+
+  /* 背景装饰 */
+  --grid-line: rgba(255, 255, 255, 0.025);
+  --glow-mask: #000;
+  --glow-2: rgba(110, 231, 183, 0.05);
+  --scrollbar: rgba(255, 255, 255, 0.12);
+  --scrollbar-hover: rgba(255, 255, 255, 0.22);
+
+  /* 浮层阴影与遮罩 */
+  --shadow-overlay: 0 20px 50px -12px rgba(0, 0, 0, 0.7);
+  --shadow-modal: 0 40px 90px -20px rgba(0, 0, 0, 0.8);
+  --modal-mask: rgba(4, 5, 7, 0.72);
+}
+
+/* ============================================================
+   浅色主题 —— 亮白画布 / 同款酸性绿 / 深墨文字
+   ============================================================ */
+[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #f6f7f9;
+  --bg-raised: #ffffff;
+  --bg-overlay: #ffffff;
+  --bg-hover: #eef0f3;
+  --line: rgba(15, 20, 30, 0.09);
+  --line-strong: rgba(15, 20, 30, 0.18);
+
+  --text: #12151b;
+  --text-dim: #545b67;
+  --text-faint: #8a919e;
+
+  /* 浅底上用深翡翠绿：白底对比度约 5.9:1，久看不累；按钮上配白字 */
+  --acid: #047857;
+  --acid-ink: #ffffff;
+  --acid-glow: rgba(4, 120, 87, 0.1);
+
+  --ok: #16a34a;
+  --bad: #e11d48;
+  --warn: #d97706;
+  --info: #64748b;
+
+  --neutral: #12151b;
+
+  --grid-line: rgba(15, 20, 30, 0.04);
+  --glow-mask: #000;
+  --glow-2: rgba(4, 120, 87, 0.05);
+  --scrollbar: rgba(15, 20, 30, 0.18);
+  --scrollbar-hover: rgba(15, 20, 30, 0.32);
+
+  --shadow-overlay: 0 20px 50px -14px rgba(20, 30, 50, 0.18);
+  --shadow-modal: 0 40px 90px -24px rgba(20, 30, 50, 0.28);
+  --modal-mask: rgba(30, 40, 60, 0.34);
+}
+
+* { box-sizing: border-box; }
+
+html, body, #app { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+  /* 主题切换时的平滑过渡 */
+  transition: background-color var(--theme-dur) var(--ease-out),
+    color var(--theme-dur) var(--ease-out);
+}
+
+/* 背景：细线网格 + 顶部微光 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, var(--glow-mask) 30%, transparent 75%);
+}
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(600px 300px at 15% -5%, var(--acid-glow), transparent 70%),
+    radial-gradient(800px 400px at 85% -10%, var(--glow-2), transparent 70%);
+}
+
+#app { position: relative; z-index: 1; }
+
+::selection { background: var(--acid); color: var(--acid-ink); }
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar);
+  border-radius: 8px;
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
+
+/* ---------- 排版 ---------- */
+.display {
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+  margin: 0;
+}
+.display-xl { font-size: clamp(3rem, 8vw, 6.5rem); }
+.display-lg { font-size: clamp(2.2rem, 5vw, 4rem); }
+.display-md { font-size: clamp(1.5rem, 3vw, 2.2rem); }
+
+.mono { font-family: var(--font-mono); font-feature-settings: "tnum"; }
+.dim { color: var(--text-dim); }
+.faint { color: var(--text-faint); }
+.acid { color: var(--acid); }
+
+.outline-text {
+  color: transparent;
+  -webkit-text-stroke: 1px var(--line-strong);
+}
+
+/* 章节编号标签：01 / SYSTEM */
+.section-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.section-tag::before {
+  content: "";
+  width: 32px;
+  height: 1px;
+  background: var(--acid);
+}
+
+/* ---------- 入场动效 ---------- */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes rise-left {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+  50% { box-shadow: 0 0 0 5px transparent; opacity: 0.75; }
+}
+@keyframes scan {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(400%); }
+}
+
+.reveal {
+  opacity: 0;
+  animation: rise 0.7s var(--ease-out) forwards;
+  animation-delay: var(--d, 0s);
+}
+
+/* ---------- 通用元素 ---------- */
+a { color: var(--acid); text-decoration: none; }
+
+.panel {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  position: relative;
+  transition: background-color var(--theme-dur) var(--ease-out),
+    border-color var(--theme-dur) var(--ease-out);
+}
+
+.divider { height: 1px; background: var(--line); border: none; }
+
+/* 呼吸状态点 */
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: none;
+}
+.dot.ok   { background: var(--ok);   color: var(--ok);   animation: pulse-dot 2.4s infinite; }
+.dot.bad  { background: var(--bad);  color: var(--bad); }
+.dot.warn { background: var(--warn); color: var(--warn); animation: pulse-dot 2.4s infinite; }
+.dot.info { background: var(--info); color: var(--info); }
+.dot.acid { background: var(--acid); color: var(--acid); animation: pulse-dot 2.4s infinite; }
+
+/* 页面容器 */
+.page { padding: 40px 48px 64px; max-width: 1440px; margin: 0 auto; }
+.page-head { margin-bottom: 36px; }
+.page-head h1 { margin: 10px 0 6px; }
+.page-sub { color: var(--text-dim); max-width: 560px; }
+
+@media (max-width: 860px) {
+  .page { padding: 24px 20px 48px; }
+}

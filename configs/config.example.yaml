@@ -1,0 +1,26 @@
+server:
+    host: 0.0.0.0
+    port: 18327
+database:
+    path: data/outlook-manager.db
+auth:
+    jwt_secret: ""      # 留空 = 首次启动自动生成并持久化到数据库
+    token_ttl_hours: 72
+    admin_username: admin
+    admin_password: ""  # 留空 = 首次启动随机生成（打印一次 + 备份到 data/initial_admin_password.txt）
+scheduler:
+    enabled: true
+    refresh_interval: 12h0m0s    # token 刷新周期
+    health_interval: 6h0m0s      # 健康检测周期
+    keepalive_interval: 24h0m0s  # 保活周期
+    mail_interval: 30m0s         # 收信周期
+proxy:
+    enabled: false
+    url: ""             # 全局代理，如 http://127.0.0.1:7897；环境变量 OM_PROXY 可覆盖
+microsoft:
+    token_url: https://login.microsoftonline.com/common/oauth2/v2.0/token
+    graph_url: https://graph.microsoft.com/v1.0
+    scope: https://graph.microsoft.com/.default offline_access
+log:
+    level: info
+    file: data/outlook-manager.log
