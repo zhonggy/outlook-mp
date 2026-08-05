@@ -169,6 +169,44 @@ func (s *Service) CheckAll(ctx context.Context, statusFilter string, stagger tim
 	return s.runBatch(ctx, model.TaskHealth, statusFilter, stagger, s.CheckHealth)
 }
 
+// CheckSelected 对指定 ID 的账号逐个健康检测（前端多选批量操作）。
+func (s *Service) CheckSelected(ctx context.Context, ids []uint) BatchResult {
+	return s.runOnIDs(ctx, ids, s.CheckHealth)
+}
+
+// RefreshSelected 对指定 ID 的账号逐个刷新 token（前端多选批量操作）。
+func (s *Service) RefreshSelected(ctx context.Context, ids []uint) BatchResult {
+	return s.runOnIDs(ctx, ids, s.RefreshAccount)
+}
+
+// runOnIDs 遍历 ID 列表执行任务并汇总；账号不存在计为失败。
+func (s *Service) runOnIDs(ctx context.Context, ids []uint,
+	fn func(context.Context, *model.Account) RefreshResult) BatchResult {
+	var res BatchResult
+	for _, id := range ids {
+		if ctx.Err() != nil {
+			break
+		}
+		acc, err := s.Accounts.ByID(id)
+		if err != nil {
+			res.Total++
+			res.Fail++
+			continue
+		}
+		out := fn(ctx, acc)
+		res.Total++
+		switch out.Status {
+		case model.TaskSuccess:
+			res.Success++
+		case model.TaskSkip:
+			res.Skip++
+		default:
+			res.Fail++
+		}
+	}
+	return res
+}
+
 // KeepaliveAll 批量保活。
 func (s *Service) KeepaliveAll(ctx context.Context, stagger time.Duration) BatchResult {
 	return s.runBatch(ctx, model.TaskKeepalive, "", stagger, s.Keepalive)

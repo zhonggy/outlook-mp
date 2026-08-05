@@ -38,6 +38,8 @@ func New(h *handler.Handler, svc *service.Service, jwtSecret string) *gin.Engine
 			authed.POST("/accounts/delete-by-status", h.DeleteAccountsByStatus)
 			authed.POST("/accounts/refresh-all", h.RefreshAllAccounts)
 			authed.POST("/accounts/check-all", h.CheckAllAccounts)
+			authed.POST("/accounts/batch-check", h.BatchCheckAccounts)
+			authed.POST("/accounts/batch-refresh", h.BatchRefreshAccounts)
 			authed.GET("/accounts/:id", h.GetAccount)
 			authed.PUT("/accounts/:id", h.UpdateAccount)
 			authed.DELETE("/accounts/:id", h.DeleteAccount)

@@ -111,11 +111,19 @@ export const accountApi = {
   },
   refresh: (id: number) => api.post(`/accounts/${id}/refresh`),
   check: (id: number) => api.post(`/accounts/${id}/check`),
-  refreshAll: () => api.post('/accounts/refresh-all'),
-  // 全量检测耗时与账号数成正比，放宽到 10 分钟
+  // 全量/批量任务耗时与账号数成正比，放宽到 10 分钟
+  refreshAll: () =>
+    api.post<{ total: number; success: number; fail: number; skip: number }>(
+      '/accounts/refresh-all', null, { timeout: 10 * 60 * 1000 }),
   checkAll: () =>
     api.post<{ total: number; success: number; fail: number; skip: number }>(
       '/accounts/check-all', null, { timeout: 10 * 60 * 1000 }),
+  batchCheck: (ids: number[]) =>
+    api.post<{ total: number; success: number; fail: number; skip: number }>(
+      '/accounts/batch-check', { ids }, { timeout: 10 * 60 * 1000 }),
+  batchRefresh: (ids: number[]) =>
+    api.post<{ total: number; success: number; fail: number; skip: number }>(
+      '/accounts/batch-refresh', { ids }, { timeout: 10 * 60 * 1000 }),
   groups: () => api.get('/accounts/groups'),
 }
 

@@ -20,7 +20,12 @@
         <AppButton variant="primary" :icon="Plus" @click="showCreate = true">添加</AppButton>
         <AppButton :icon="Upload" @click="showImport = true">导入</AppButton>
         <AppButton :icon="Download" @click="openExport">导出</AppButton>
-        <AppButton :icon="HeartPulse" :loading="checking" @click="showCheckAll = true">健康检测</AppButton>
+        <AppButton :icon="HeartPulse" :loading="checking" @click="onBatchTask('check')">
+          健康检测{{ selection.size ? `(${selection.size})` : '' }}
+        </AppButton>
+        <AppButton :icon="RefreshCw" :loading="refreshing" @click="onBatchTask('refresh')">
+          令牌刷新{{ selection.size ? `(${selection.size})` : '' }}
+        </AppButton>
         <AppButton variant="danger" :icon="Eraser" @click="onDeleteDead">清理失效</AppButton>
         <AppButton variant="danger" :icon="Trash2" :disabled="!selection.size" @click="onBatchDelete">
           删除{{ selection.size ? `(${selection.size})` : '' }}
@@ -140,15 +145,12 @@
       </template>
     </AppModal>
 
-    <!-- 全量健康检测确认 -->
-    <AppModal v-model="showCheckAll" title="一键健康检测" tag="BATCH CHECK" width="420px">
-      <p class="confirm-text">
-        将对全部账号逐一执行健康检测。逐账号请求微软接口，账号较多时可能需要几分钟，
-        期间按钮会保持加载状态，请勿重复点击。
-      </p>
+    <!-- 批量任务确认（健康检测 / 令牌刷新，无选中=全量，有选中=仅选中） -->
+    <AppModal v-model="batchConfirm.show" :title="batchConfirm.title" tag="BATCH" width="420px">
+      <p class="confirm-text">{{ batchConfirm.text }}</p>
       <template #footer>
-        <AppButton @click="showCheckAll = false">取消</AppButton>
-        <AppButton variant="primary" :icon="HeartPulse" @click="doCheckAll">开始检测</AppButton>
+        <AppButton @click="batchConfirm.show = false">取消</AppButton>
+        <AppButton variant="primary" :icon="Play" @click="batchConfirm.run">开始执行</AppButton>
       </template>
     </AppModal>
 
@@ -168,7 +170,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'
 import {
-  Search as SearchIcon, Plus, Upload, Download, Trash2, RefreshCw, HeartPulse, Pencil, Eraser,
+  Search as SearchIcon, Plus, Upload, Download, Trash2, RefreshCw, HeartPulse, Pencil, Eraser, Play,
 } from 'lucide-vue-next'
 import { accountApi, type Account } from '../api'
 import { toast } from '../components/ui/toast'
@@ -210,9 +212,10 @@ const showCreate = ref(false)
 const showEdit = ref(false)
 const showImport = ref(false)
 const showExport = ref(false)
-const showCheckAll = ref(false)
 const exporting = ref(false)
 const checking = ref(false)
+const refreshing = ref(false)
+const batchConfirm = reactive({ show: false, title: '', text: '', run: () => {} })
 const importText = ref('')
 const createForm = reactive({ email: '', password: '', client_id: '', refresh_token: '', group_name: '', tags: '' })
 const editForm = reactive({ id: 0, email: '', password: '', group_name: '', tags: '', proxy: '', remark: '' })
@@ -369,15 +372,31 @@ async function doExport() {
   }
 }
 
-async function doCheckAll() {
-  showCheckAll.value = false
-  checking.value = true
+// 批量任务：无选中 → 全量；有选中 → 仅选中的账号
+function onBatchTask(kind: 'check' | 'refresh') {
+  const n = selection.value.size
+  const action = kind === 'check' ? '健康检测' : '令牌刷新'
+  batchConfirm.title = n ? `${action}（选中 ${n} 个）` : `一键${action}`
+  batchConfirm.text = n
+    ? `将对选中的 ${n} 个账号执行${action}，逐账号请求微软接口。`
+    : `将对全部账号逐一执行${action}。账号较多时可能需要几分钟，期间按钮保持加载状态，请勿重复点击。`
+  batchConfirm.show = true
+  batchConfirm.run = () => runBatchTask(kind)
+}
+
+async function runBatchTask(kind: 'check' | 'refresh') {
+  batchConfirm.show = false
+  const busy = kind === 'check' ? checking : refreshing
+  busy.value = true
   try {
-    const { data } = await accountApi.checkAll()
-    toast.ok(`检测完成：共 ${data.total}，成功 ${data.success}，失败 ${data.fail}，跳过 ${data.skip}`)
+    const ids = [...selection.value]
+    const { data } = kind === 'check'
+      ? (ids.length ? await accountApi.batchCheck(ids) : await accountApi.checkAll())
+      : (ids.length ? await accountApi.batchRefresh(ids) : await accountApi.refreshAll())
+    toast.ok(`${kind === 'check' ? '检测' : '刷新'}完成：共 ${data.total}，成功 ${data.success}，失败 ${data.fail}，跳过 ${data.skip}`)
     load()
   } catch { /* 拦截器已提示 */ } finally {
-    checking.value = false
+    busy.value = false
   }
 }
 

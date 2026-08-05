@@ -301,6 +301,38 @@ func (h *Handler) CheckAllAccounts(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
+type batchIDsReq struct {
+	IDs []uint `json:"ids" binding:"required"`
+}
+
+// BatchCheckAccounts POST /accounts/batch-check（对选中账号健康检测，上限 1000 个）
+func (h *Handler) BatchCheckAccounts(c *gin.Context) {
+	var req batchIDsReq
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ids 必填"})
+		return
+	}
+	if len(req.IDs) > 1000 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "单次最多 1000 个账号"})
+		return
+	}
+	c.JSON(http.StatusOK, h.svc.CheckSelected(c.Request.Context(), req.IDs))
+}
+
+// BatchRefreshAccounts POST /accounts/batch-refresh（对选中账号刷新 token，上限 1000 个）
+func (h *Handler) BatchRefreshAccounts(c *gin.Context) {
+	var req batchIDsReq
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ids 必填"})
+		return
+	}
+	if len(req.IDs) > 1000 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "单次最多 1000 个账号"})
+		return
+	}
+	c.JSON(http.StatusOK, h.svc.RefreshSelected(c.Request.Context(), req.IDs))
+}
+
 // ListGroups GET /accounts/groups
 func (h *Handler) ListGroups(c *gin.Context) {
 	groups, err := h.svc.Accounts.DistinctGroups()
