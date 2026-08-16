@@ -38,6 +38,44 @@ make build          # 前端 build + 后端打包，产物在 bin/outlook-manage
 
 浏览器访问 `http://服务器IP:18327`。
 
+### 一键部署脚本（Linux 服务器，推荐）
+
+`deploy/deploy.sh` 可在服务器上自动完成：检测/安装 Go + Node → 构建单二进制 → 配置 systemd 开机自启 → 启动服务 → 输出管理员登录信息。
+
+将源码放到服务器（git clone 或 scp）后执行：
+
+```bash
+sudo bash deploy/deploy.sh                  # 源码位于 /opt/outlook-manager
+sudo bash deploy/deploy.sh --dir /path/to/src   # 源码在其他目录
+sudo bash deploy/deploy.sh --git <仓库URL>      # 直接从 git 仓库拉取源码
+sudo bash deploy/deploy.sh --no-proxy           # 关闭 config 全局代理（服务器无本地代理时必加）
+```
+
+常用参数：
+
+| 参数 | 说明 |
+|------|------|
+| `--git <URL>` | 无需手动上传，直接从 git 仓库克隆源码再部署 |
+| `--dir /path` | 指定源码目录（默认 `/opt/outlook-manager`） |
+| `--no-proxy` | 将 configs/config.yaml 中 `proxy.enabled` 改为 false（服务器无代理时用） |
+| `--skip-deps` | 跳过 Go/Node 安装（已装好时加速） |
+| `--no-systemd` | 前台运行，不装 systemd（调试用） |
+
+脚本特性：
+
+- 自动检测 Go ≥ 1.25 / Node ≥ 20，缺失才安装（Go 官方二进制 + nvm）
+- 幂等可重跑：更新代码后再次执行即自动重新构建并重启服务
+- systemd 服务带 `Restart=always`，进程异常自动拉起
+- 部署完成后输出访问地址与管理员初始密码（备份于 `data/initial_admin_password.txt`，0600）
+
+部署后常用命令：
+
+```bash
+systemctl status outlook-manager      # 查看状态
+journalctl -u outlook-manager -f      # 跟踪日志
+systemctl restart outlook-manager     # 重启
+```
+
 ### 开发模式
 
 ```bash
@@ -125,6 +163,7 @@ POST /ingest/accounts                自动化上传（X-API-Key 认证）
 ```
 outlook-manager/
 ├── cmd/server/          # 入口（main + 静态资源挂载）
+├── deploy/              # 服务器一键部署脚本（deploy.sh）
 ├── internal/
 │   ├── config/          # 配置加载（yaml + env 覆盖）
 │   ├── model/           # GORM 模型与状态常量

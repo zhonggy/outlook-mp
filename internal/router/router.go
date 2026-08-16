@@ -60,6 +60,8 @@ func New(h *handler.Handler, svc *service.Service, jwtSecret string) *gin.Engine
 			authed.GET("/apikeys", h.ListAPIKeys)
 			authed.POST("/apikeys", h.CreateAPIKey)
 			authed.DELETE("/apikeys/:id", h.DeleteAPIKey)
+
+			authed.POST("/settings/import-from-register", h.ImportFromRegister)
 		}
 	}
 

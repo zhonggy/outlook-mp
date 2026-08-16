@@ -9,6 +9,7 @@ import (
 
 	"outlook-manager/internal/model"
 	"outlook-manager/internal/pkg"
+	"outlook-manager/internal/service"
 )
 
 func jsonUnmarshalStd(data []byte, v any) error { return json.Unmarshal(data, v) }
@@ -124,6 +125,30 @@ func (h *Handler) CreateAPIKey(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, key)
+}
+
+// ---- OutlookRegister 对接 ----
+
+type importRegisterReq struct {
+	Text string `json:"text" binding:"required"`
+}
+
+// ImportFromRegister POST /settings/import-from-register
+// 接受 OutlookRegister 输出的 oauth2.txt 格式（email----password----client_id----refresh_token），
+// 批量导入账号，来源标记为 register。
+func (h *Handler) ImportFromRegister(c *gin.Context) {
+	var req importRegisterReq
+	if err := c.ShouldBindJSON(&req); err != nil || req.Text == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请粘贴 oauth2.txt 内容"})
+		return
+	}
+	items := service.ParseImportText(req.Text)
+	if len(items) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "未解析到有效账号，请确认格式为 email----password----client_id----refresh_token"})
+		return
+	}
+	res := h.svc.ImportAccounts(items, model.SourceRegister)
+	c.JSON(http.StatusOK, res)
 }
 
 // DeleteAPIKey DELETE /apikeys/:id

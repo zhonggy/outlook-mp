@@ -76,6 +76,47 @@
         </div>
       </section>
 
+      <!-- OutlookRegister 对接 -->
+      <section class="panel block reveal" style="grid-column: 1 / -1" :style="{ '--d': '.26s' }">
+        <div class="block-head">
+          <span class="section-tag">OutlookRegister 对接</span>
+          <span class="hint mono">粘贴 oauth2.txt 内容批量导入</span>
+        </div>
+        <div class="register-area">
+          <textarea
+            v-model="registerText"
+            class="register-input mono"
+            rows="8"
+            placeholder="从 OutlookRegister 的 Results/oauth2.txt 复制内容粘贴到这里&#10;格式：email----password----client_id----refresh_token（每行一个）"
+          />
+          <div class="register-foot">
+            <span class="hint mono">
+              <template v-if="registerText">
+                已输入 {{ registerText.split('\n').filter(l => l.trim() && !l.startsWith('#')).length }} 个账号
+              </template>
+              <template v-else>支持格式：email----密码----client_id----refresh_token</template>
+            </span>
+            <AppButton
+              variant="primary"
+              :icon="Upload"
+              :loading="importing"
+              :disabled="!registerText.trim()"
+              @click="importFromRegister"
+            >导入</AppButton>
+          </div>
+          <div v-if="importResult" class="register-result">
+            <span class="result-badge result-created">新建 {{ importResult.created }}</span>
+            <span class="result-badge result-updated">更新 {{ importResult.updated }}</span>
+            <span v-if="importResult.skipped" class="result-badge result-skipped">跳过 {{ importResult.skipped }}</span>
+            <button v-if="importResult" class="act" title="清空结果" @click="importResult = null"><X :size="14" /></button>
+          </div>
+          <div v-if="importResult?.errors?.length" class="register-errors">
+            <div v-for="(e,i) in importResult.errors.slice(0,5)" :key="i" class="register-error mono">{{ e }}</div>
+            <div v-if="importResult.errors.length > 5" class="hint mono">…还有 {{ importResult.errors.length - 5 }} 条错误</div>
+          </div>
+        </div>
+      </section>
+
       <!-- 日志清理 -->
       <section class="panel block reveal" style="--d:.28s">
         <div class="block-head">
@@ -141,8 +182,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
-import { Save, Plus, Copy, Trash2, Lock, KeyRound, Eraser } from 'lucide-vue-next'
-import { apikeyApi, authApi, taskApi } from '../api'
+import { Save, Plus, Copy, Trash2, Lock, KeyRound, Eraser, Upload, X } from 'lucide-vue-next'
+import { apikeyApi, authApi, taskApi, settingsApi } from '../api'
 import { toast } from '../components/ui/toast'
 import AppButton from '../components/ui/AppButton.vue'
 import AppInput from '../components/ui/AppInput.vue'
@@ -164,6 +205,11 @@ const logRetention = ref('720h')
 const logTotal = ref(0)
 const cleaning = ref(false)
 const confirmClear = reactive({ show: false })
+
+// OutlookRegister 对接
+const registerText = ref('')
+const importing = ref(false)
+const importResult = ref<any>(null)
 const retentionOptions = [
   { value: '72h', label: '3 天' },
   { value: '168h', label: '7 天' },
@@ -364,6 +410,24 @@ function copy(text: string) {
   navigator.clipboard.writeText(text).then(() => toast.ok('已复制'))
 }
 
+async function importFromRegister() {
+  if (!registerText.value.trim()) return
+  importing.value = true
+  try {
+    const { data } = await settingsApi.importFromRegister(registerText.value.trim())
+    importResult.value = data
+    const total = (data.created || 0) + (data.updated || 0)
+    if (total > 0) {
+      toast.ok(`导入完成: 新建 ${data.created}，更新 ${data.updated}`)
+      registerText.value = ''
+    } else {
+      toast.warn(`未导入新账号（已存在 ${data.updated}，跳过 ${data.skipped || 0}）`)
+    }
+  } catch (e: any) {
+    toast.bad(e?.response?.data?.error || '导入失败')
+  } finally { importing.value = false }
+}
+
 onMounted(() => {
   loadSchedule()
   loadKeys()
@@ -517,5 +581,76 @@ onMounted(() => {
 
 @media (max-width: 1100px) {
   .settings-grid { grid-template-columns: 1fr; }
+}
+
+/* OutlookRegister 对接 */
+.register-area {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.register-input {
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--text-dim);
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.25s;
+}
+.register-input:focus {
+  border-color: var(--acid);
+}
+.register-input::placeholder {
+  color: var(--text-faint);
+  opacity: 0.6;
+}
+.register-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.register-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg);
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  animation: fadeIn 0.3s var(--ease-out);
+}
+.result-badge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 100px;
+}
+.result-created { background: rgba(62, 207, 142, 0.12); color: var(--acid); }
+.result-updated { background: rgba(255, 184, 108, 0.12); color: var(--warn); }
+.result-skipped { background: rgba(148, 163, 184, 0.1); color: var(--text-faint); }
+.register-errors {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  background: rgba(255, 84, 112, 0.06);
+  border: 1px solid rgba(255, 84, 112, 0.15);
+  border-radius: var(--radius);
+}
+.register-error {
+  font-size: 11px;
+  color: var(--bad);
+  word-break: break-all;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 </style>
