@@ -151,15 +151,3 @@ export const apikeyApi = {
   create: (name: string) => api.post('/apikeys', { name }),
   remove: (id: number) => api.delete(`/apikeys/${id}`),
 }
-
-export const settingsApi = {
-  importFromRegister: (text: string) =>
-    api.post<ImportResult>('/settings/import-from-register', { text }),
-}
-
-export interface ImportResult {
-  created: number
-  updated: number
-  skipped: number
-  errors?: string[]
-}
