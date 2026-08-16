@@ -74,6 +74,9 @@ func (c *Client) CSRFToken() (string, error) {
 // ImportAccounts 批量导入账号（格式：邮箱----密码----ClientID----RefreshToken）。
 // groupID 为 outlookEmail 中的分组 ID。
 func (c *Client) ImportAccounts(accountString string, groupID int) (*ImportResult, error) {
+	if err := c.Login(); err != nil {
+		return nil, err
+	}
 	csrf, err := c.CSRFToken()
 	if err != nil {
 		return nil, err
