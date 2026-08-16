@@ -151,3 +151,11 @@ export const apikeyApi = {
   create: (name: string) => api.post('/apikeys', { name }),
   remove: (id: number) => api.delete(`/apikeys/${id}`),
 }
+
+// outlookEmail 对接
+export const outlookEmailApi = {
+  config: () => api.get('/settings/outlook-email'),
+  saveConfig: (data: Record<string, unknown>) => api.put('/settings/outlook-email', data),
+  test: () => api.post<{ ok: boolean; detail: string }>('/settings/outlook-email/test'),
+  push: () => api.post<{ ok: boolean; pushed: number; added: number; skipped: number; invalid: number; detail?: string }>('/settings/outlook-email/push'),
+}

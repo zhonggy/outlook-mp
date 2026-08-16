@@ -60,6 +60,11 @@ func New(h *handler.Handler, svc *service.Service, jwtSecret string) *gin.Engine
 			authed.GET("/apikeys", h.ListAPIKeys)
 			authed.POST("/apikeys", h.CreateAPIKey)
 			authed.DELETE("/apikeys/:id", h.DeleteAPIKey)
+
+			authed.GET("/settings/outlook-email", h.GetOutlookEmailConfig)
+			authed.PUT("/settings/outlook-email", h.SetOutlookEmailConfig)
+			authed.POST("/settings/outlook-email/test", h.TestOutlookEmail)
+			authed.POST("/settings/outlook-email/push", h.PushToOutlookEmail)
 		}
 	}
 

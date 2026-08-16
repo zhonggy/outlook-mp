@@ -120,6 +120,11 @@ func (s *Service) CheckHealth(ctx context.Context, acc *model.Account) RefreshRe
 	})
 	res := RefreshResult{Status: model.TaskSuccess, Message: "健康"}
 	s.logTask(model.TaskHealth, acc, res.Status, res.Message, start)
+
+	// 健康检测通过后自动推送到 outlookEmail
+	acc.Status = model.StatusHealthy
+	go s.tryAutoPush(acc)
+
 	return res
 }
 

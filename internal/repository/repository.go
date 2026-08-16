@@ -152,6 +152,19 @@ func (r *AccountRepo) Delete(ids []uint) error {
 	return r.db.Delete(&model.Account{}, ids).Error
 }
 
+// MarkPushed 标记账号已推送到 outlookEmail。
+func (r *AccountRepo) MarkPushed(id uint) error {
+	now := time.Now()
+	return r.db.Model(&model.Account{}).Where("id = ?", id).Update("pushed_at", &now).Error
+}
+
+// ListHealthyUnpushed 返回所有 healthy 且未推送的账号。
+func (r *AccountRepo) ListHealthyUnpushed() ([]model.Account, error) {
+	var accounts []model.Account
+	err := r.db.Where("status = ? AND pushed_at IS NULL", model.StatusHealthy).Find(&accounts).Error
+	return accounts, err
+}
+
 // DeleteByStatus 按状态删除（如一键清理失效账号），返回删除条数。
 func (r *AccountRepo) DeleteByStatus(status string) (int64, error) {
 	res := r.db.Where("status = ?", status).Delete(&model.Account{})

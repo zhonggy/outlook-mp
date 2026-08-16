@@ -62,6 +62,7 @@ type Account struct {
 	LastCheckAt     *time.Time `json:"last_check_at,omitempty"`
 	LastKeepaliveAt *time.Time `json:"last_keepalive_at,omitempty"`
 	LastMailAt      *time.Time `json:"last_mail_at,omitempty"`
+	PushedAt        *time.Time `json:"pushed_at,omitempty"`  // 推送到 outlookEmail 的时间
 
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`

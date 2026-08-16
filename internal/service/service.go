@@ -2,6 +2,7 @@
 package service
 
 import (
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"outlook-manager/internal/config"
 	"outlook-manager/internal/model"
 	"outlook-manager/internal/msgraph"
+	"outlook-manager/internal/outemail"
 	"outlook-manager/internal/repository"
 )
 
@@ -70,4 +72,31 @@ func (s *Service) logTask(taskType string, acc *model.Account, status, message s
 	if err := s.TaskLogs.Add(entry); err != nil {
 		s.Log.Warn("写任务日志失败", "err", err)
 	}
+}
+
+// tryAutoPush 健康检测成功后自动推送到 outlookEmail（启用了才执行，失败不阻塞）。
+func (s *Service) tryAutoPush(acc *model.Account) {
+	enabled := s.Settings.Get("outlook_email.enabled", "false") == "true"
+	if !enabled {
+		return
+	}
+	url := s.Settings.Get("outlook_email.url", "")
+	pwd := s.Settings.Get("outlook_email.password", "")
+	if url == "" || pwd == "" {
+		return
+	}
+	groupID := 1
+	fmt.Sscanf(s.Settings.Get("outlook_email.group_id", "1"), "%d", &groupID)
+	if groupID <= 0 {
+		groupID = 1
+	}
+
+	text := fmt.Sprintf("%s----%s----%s----%s", acc.Email, acc.Password, acc.ClientID, acc.RefreshToken)
+	client := outemail.New(url, pwd)
+	if _, err := client.ImportAccounts(text, groupID); err != nil {
+		s.Log.Warn("自动推送到 outlookEmail 失败", "email", acc.Email, "err", err)
+		return
+	}
+	_ = s.Accounts.MarkPushed(acc.ID)
+	s.Log.Info("已推送到 outlookEmail", "email", acc.Email)
 }

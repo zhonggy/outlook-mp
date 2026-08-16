@@ -76,6 +76,34 @@
         </div>
       </section>
 
+      <!-- outlookEmail 对接 -->
+      <section class="panel block reveal" style="--d:.26s">
+        <div class="block-head">
+          <span class="section-tag">outlookEmail 对接</span>
+          <button class="switch" :class="{ on: oeEnabled }" @click="toggleOE">
+            <span class="knob" />
+          </button>
+        </div>
+        <div class="form-grid">
+          <AppInput v-model="oeUrl" label="服务器地址" placeholder="http://IP:5000" />
+          <AppInput v-model="oePassword" label="登录密码" type="password" placeholder="outlookEmail 的 Web 登录密码" />
+          <AppInput v-model="oeGroupId" label="分组 ID" type="number" placeholder="1" />
+        </div>
+        <div class="block-foot">
+          <span class="hint mono">健康检测通过后自动推送，也可手动推送</span>
+          <div class="foot-ops">
+            <AppButton :icon="Link" :loading="oeTesting" @click="testOE">测试连接</AppButton>
+            <AppButton :icon="Send" :loading="oePushing" @click="pushOE">手动推送</AppButton>
+            <AppButton variant="primary" :icon="Save" :loading="oeSaving" @click="saveOE">保存</AppButton>
+          </div>
+        </div>
+        <div v-if="oeResult" class="oe-result" :class="oeResult.ok ? 'oe-ok' : 'oe-err'">
+          <span>{{ oeResult.detail || `推送 ${oeResult.pushed} 个，新增 ${oeResult.added}，跳过 ${oeResult.skipped}` }}</span>
+          <button class="act" @click="oeResult = null"><X :size="14" /></button>
+        </div>
+        <div class="hint mono" style="margin-top:8px">推送格式：邮箱----密码----ClientID----RefreshToken，仅推送 healthy 且未推送过的账号。</div>
+      </section>
+
       <!-- 日志清理 -->
       <section class="panel block reveal" style="--d:.28s">
         <div class="block-head">
@@ -141,8 +169,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
-import { Save, Plus, Copy, Trash2, Lock, KeyRound, Eraser } from 'lucide-vue-next'
-import { apikeyApi, authApi, taskApi } from '../api'
+import { Save, Plus, Copy, Trash2, Lock, KeyRound, Eraser, Link, Send, X } from 'lucide-vue-next'
+import { apikeyApi, authApi, taskApi, outlookEmailApi } from '../api'
 import { toast } from '../components/ui/toast'
 import AppButton from '../components/ui/AppButton.vue'
 import AppInput from '../components/ui/AppInput.vue'
@@ -164,6 +192,16 @@ const logRetention = ref('720h')
 const logTotal = ref(0)
 const cleaning = ref(false)
 const confirmClear = reactive({ show: false })
+
+// outlookEmail 对接
+const oeEnabled = ref(false)
+const oeUrl = ref('')
+const oePassword = ref('')
+const oeGroupId = ref('1')
+const oeSaving = ref(false)
+const oeTesting = ref(false)
+const oePushing = ref(false)
+const oeResult = ref<any>(null)
 const retentionOptions = [
   { value: '72h', label: '3 天' },
   { value: '168h', label: '7 天' },
@@ -364,10 +402,63 @@ function copy(text: string) {
   navigator.clipboard.writeText(text).then(() => toast.ok('已复制'))
 }
 
+// ---- outlookEmail 对接 ----
+async function loadOE() {
+  try {
+    const { data } = await outlookEmailApi.config()
+    oeEnabled.value = data.enabled
+    oeUrl.value = data.url || ''
+    oePassword.value = data.password || ''
+    oeGroupId.value = String(data.group_id || 1)
+  } catch (e) {}
+}
+async function toggleOE() {
+  oeEnabled.value = !oeEnabled.value
+  await saveOE()
+}
+async function saveOE() {
+  oeSaving.value = true
+  try {
+    await outlookEmailApi.saveConfig({
+      enabled: oeEnabled.value,
+      url: oeUrl.value.trim(),
+      password: oePassword.value,
+      group_id: parseInt(oeGroupId.value) || 1,
+    })
+    toast.ok('outlookEmail 配置已保存')
+  } catch (e: any) { toast.bad(e?.response?.data?.error || '保存失败') }
+  finally { oeSaving.value = false }
+}
+async function testOE() {
+  oeTesting.value = true
+  oeResult.value = null
+  try {
+    const { data } = await outlookEmailApi.test()
+    oeResult.value = data
+    toast[data.ok ? 'ok' : 'bad'](data.detail)
+  } catch (e: any) { toast.bad(e?.response?.data?.error || '测试失败') }
+  finally { oeTesting.value = false }
+}
+async function pushOE() {
+  oePushing.value = true
+  oeResult.value = null
+  try {
+    const { data } = await outlookEmailApi.push()
+    oeResult.value = data
+    if (data.ok) {
+      toast.ok(`推送完成: ${data.pushed} 个账号，新增 ${data.added}，跳过 ${data.skipped}`)
+    } else {
+      toast.bad(data.detail || '推送失败')
+    }
+  } catch (e: any) { toast.bad(e?.response?.data?.error || '推送失败') }
+  finally { oePushing.value = false }
+}
+
 onMounted(() => {
   loadSchedule()
   loadKeys()
   loadLogTotal()
+  loadOE()
 })
 </script>
 
@@ -518,4 +609,19 @@ onMounted(() => {
 @media (max-width: 1100px) {
   .settings-grid { grid-template-columns: 1fr; }
 }
+
+/* outlookEmail 对接 */
+.oe-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  animation: oeFade 0.3s var(--ease-out);
+}
+.oe-ok { background: rgba(62, 207, 142, 0.08); border: 1px solid rgba(62, 207, 142, 0.2); color: var(--acid); }
+.oe-err { background: rgba(255, 84, 112, 0.06); border: 1px solid rgba(255, 84, 112, 0.15); color: var(--bad); }
+@keyframes oeFade { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
 </style>
