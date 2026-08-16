@@ -13,20 +13,23 @@ import (
 
 // Client outlookEmail 内部 API 客户端。
 type Client struct {
-	baseURL     string
-	password    string
-	httpClient  *http.Client
-	sessionCookie string // 手动维护 session cookie（避免 cookiejar 的 session 更新问题）
+	baseURL  string
+	password string
+	client   *http.Client
+	cookies  []*http.Cookie // 手动维护所有 cookie
 }
 
 // New 创建客户端。
 func New(baseURL, password string) *Client {
 	return &Client{
-		baseURL:    strings.TrimRight(baseURL, "/"),
-		password:   password,
-		httpClient: &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse // 不自动跟随重定向，手动处理 cookie
-		}},
+		baseURL:  strings.TrimRight(baseURL, "/"),
+		password: password,
+		client: &http.Client{
+			Timeout: 30 * time.Second,
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
 	}
 }
 
@@ -42,8 +45,7 @@ func (c *Client) Login() error {
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 		return fmt.Errorf("登录失败 HTTP %d: %s", resp.StatusCode, string(b))
 	}
-	// 从响应中提取 session cookie
-	c.sessionCookie = extractCookie(resp, "session")
+	c.mergeCookies(resp.Cookies())
 	return nil
 }
 
@@ -54,10 +56,7 @@ func (c *Client) CSRFToken() (string, error) {
 		return "", fmt.Errorf("获取 CSRF Token 失败: %w", err)
 	}
 	defer resp.Body.Close()
-	// 更新 session cookie（generate_csrf 会修改 session，返回新 cookie）
-	if ck := extractCookie(resp, "session"); ck != "" {
-		c.sessionCookie = ck
-	}
+	c.mergeCookies(resp.Cookies())
 
 	var result struct {
 		CSRFToken    string `json:"csrf_token"`
@@ -132,26 +131,28 @@ func (c *Client) do(method, path string, body any, extraHeaders map[string]strin
 	for k, v := range extraHeaders {
 		req.Header.Set(k, v)
 	}
-	if c.sessionCookie != "" {
-		req.Header.Set("Cookie", "session="+c.sessionCookie)
+	// 发送所有已保存的 cookie
+	for _, ck := range c.cookies {
+		req.AddCookie(ck)
 	}
-	return c.httpClient.Do(req)
+	return c.client.Do(req)
 }
 
-func extractCookie(resp *http.Response, name string) string {
-	for _, c := range resp.Cookies() {
-		if c.Name == name {
-			return c.Value
+// mergeCookies 合并响应中的 cookie（同名覆盖，保留其他）。
+func (c *Client) mergeCookies(cookies []*http.Cookie) {
+	for _, newCk := range cookies {
+		found := false
+		for i, oldCk := range c.cookies {
+			if oldCk.Name == newCk.Name {
+				c.cookies[i] = newCk
+				found = true
+				break
+			}
+		}
+		if !found {
+			c.cookies = append(c.cookies, newCk)
 		}
 	}
-	// 也尝试从 Set-Cookie 头直接解析（处理某些格式变体）
-	for _, h := range resp.Header["Set-Cookie"] {
-		if strings.HasPrefix(h, name+"=") {
-			parts := strings.SplitN(h, ";", 2)
-			return strings.TrimPrefix(parts[0], name+"=")
-		}
-	}
-	return ""
 }
 
 // ImportResult 导入结果。
