@@ -80,6 +80,10 @@ func (s *Service) tryAutoPush(acc *model.Account) {
 	if !enabled {
 		return
 	}
+	// 已推送过的跳过，防止每轮健康检测重复推送
+	if fresh, err := s.Accounts.ByID(acc.ID); err == nil && fresh.PushedAt != nil {
+		return
+	}
 	url := s.Settings.Get("outlook_email.url", "")
 	pwd := s.Settings.Get("outlook_email.password", "")
 	if url == "" || pwd == "" {
