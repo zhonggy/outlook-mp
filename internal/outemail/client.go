@@ -7,33 +7,33 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/cookiejar"
-	"net/url"
 	"strings"
 	"time"
 )
 
 // Client outlookEmail 内部 API 客户端。
 type Client struct {
-	baseURL  string
-	password string
-	client   *http.Client
+	baseURL     string
+	password    string
+	httpClient  *http.Client
+	sessionCookie string // 手动维护 session cookie（避免 cookiejar 的 session 更新问题）
 }
 
 // New 创建客户端。
 func New(baseURL, password string) *Client {
-	jar, _ := cookiejar.New(nil)
 	return &Client{
-		baseURL:  strings.TrimRight(baseURL, "/"),
-		password: password,
-		client:   &http.Client{Jar: jar, Timeout: 30 * time.Second},
+		baseURL:    strings.TrimRight(baseURL, "/"),
+		password:   password,
+		httpClient: &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse // 不自动跟随重定向，手动处理 cookie
+		}},
 	}
 }
 
 // Login 登录获取 Session Cookie。
 func (c *Client) Login() error {
 	body := map[string]string{"password": c.password}
-	resp, err := c.post("/login", body, nil)
+	resp, err := c.do("POST", "/login", body, nil)
 	if err != nil {
 		return fmt.Errorf("登录失败: %w", err)
 	}
@@ -42,16 +42,23 @@ func (c *Client) Login() error {
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 		return fmt.Errorf("登录失败 HTTP %d: %s", resp.StatusCode, string(b))
 	}
+	// 从响应中提取 session cookie
+	c.sessionCookie = extractCookie(resp, "session")
 	return nil
 }
 
-// CSRFToken 获取 CSRF Token。
+// CSRFToken 获取 CSRF Token（必须先用 Login 建立 session）。
 func (c *Client) CSRFToken() (string, error) {
-	resp, err := c.get("/api/csrf-token")
+	resp, err := c.do("GET", "/api/csrf-token", nil, nil)
 	if err != nil {
 		return "", fmt.Errorf("获取 CSRF Token 失败: %w", err)
 	}
 	defer resp.Body.Close()
+	// 更新 session cookie（generate_csrf 会修改 session，返回新 cookie）
+	if ck := extractCookie(resp, "session"); ck != "" {
+		c.sessionCookie = ck
+	}
+
 	var result struct {
 		CSRFToken    string `json:"csrf_token"`
 		CSRFDisabled bool   `json:"csrf_disabled"`
@@ -84,7 +91,7 @@ func (c *Client) ImportAccounts(accountString string, groupID int) (*ImportResul
 		"provider":       "outlook",
 		"status":         "active",
 	}
-	resp, err := c.post("/api/accounts", body, headers)
+	resp, err := c.do("POST", "/api/accounts", body, headers)
 	if err != nil {
 		return nil, fmt.Errorf("导入账号失败: %w", err)
 	}
@@ -111,21 +118,40 @@ func (c *Client) Test() error {
 
 // ---- 内部 ----
 
-func (c *Client) get(path string) (*http.Response, error) {
-	req, _ := http.NewRequest("GET", c.baseURL+path, nil)
-	req.Header.Set("Accept", "application/json")
-	return c.client.Do(req)
-}
-
-func (c *Client) post(path string, body any, extraHeaders map[string]string) (*http.Response, error) {
-	b, _ := json.Marshal(body)
-	req, _ := http.NewRequest("POST", c.baseURL+path, bytes.NewReader(b))
-	req.Header.Set("Content-Type", "application/json")
+func (c *Client) do(method, path string, body any, extraHeaders map[string]string) (*http.Response, error) {
+	var bodyReader io.Reader
+	if body != nil {
+		b, _ := json.Marshal(body)
+		bodyReader = bytes.NewReader(b)
+	}
+	req, _ := http.NewRequest(method, c.baseURL+path, bodyReader)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	req.Header.Set("Accept", "application/json")
 	for k, v := range extraHeaders {
 		req.Header.Set(k, v)
 	}
-	return c.client.Do(req)
+	if c.sessionCookie != "" {
+		req.Header.Set("Cookie", "session="+c.sessionCookie)
+	}
+	return c.httpClient.Do(req)
+}
+
+func extractCookie(resp *http.Response, name string) string {
+	for _, c := range resp.Cookies() {
+		if c.Name == name {
+			return c.Value
+		}
+	}
+	// 也尝试从 Set-Cookie 头直接解析（处理某些格式变体）
+	for _, h := range resp.Header["Set-Cookie"] {
+		if strings.HasPrefix(h, name+"=") {
+			parts := strings.SplitN(h, ";", 2)
+			return strings.TrimPrefix(parts[0], name+"=")
+		}
+	}
+	return ""
 }
 
 // ImportResult 导入结果。
@@ -137,6 +163,3 @@ type ImportResult struct {
 	InvalidCount int    `json:"invalid_count"`
 	TaggedCount  int    `json:"tagged_count"`
 }
-
-// 避免 unused import
-var _ = url.Parse
