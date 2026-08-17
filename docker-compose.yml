@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  outlook-manager:
+    build: .
+    container_name: outlook-manager
+    restart: unless-stopped
+    ports:
+      - "18327:18327"
+    volumes:
+      - ./data:/app/data
+      - ./configs:/app/configs
+    environment:
+      - OM_PORT=18327
+      - TZ=Asia/Shanghai

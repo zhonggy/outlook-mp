@@ -77,6 +77,21 @@ journalctl -u outlook-manager -f       # 跟踪日志
 systemctl restart outlook-manager      # 重启
 ```
 
+### Docker 部署
+
+```bash
+# 构建并启动
+docker compose up -d --build
+
+# 查看日志
+docker logs -f outlook-manager
+
+# 重启
+docker compose restart
+```
+
+首次启动时创建 `configs/` 和 `data/` 目录，参考 `configs/config.example.yaml` 配置。
+
 ### 开发模式
 
 ```bash
@@ -165,6 +180,8 @@ POST /ingest/accounts                自动化上传（X-API-Key 认证）
 outlook-manager/
 ├── cmd/server/          # 入口（main + 静态资源挂载）
 ├── deploy/              # 一键部署脚本（deploy.sh）
+├── Dockerfile           # Docker 构建
+├── docker-compose.yml   # Docker Compose
 ├── internal/
 │   ├── config/          # 配置加载（yaml + env 覆盖）
 │   ├── model/           # GORM 模型与状态常量
