@@ -38,6 +38,45 @@ make build          # 前端 build + 后端打包，产物在 bin/outlook-manage
 
 浏览器访问 `http://服务器IP:18327`。
 
+### 一键部署（Linux 服务器）
+
+`deploy/deploy.sh` 自动完成：拉取源码 → 安装 Go/Node → 构建 → 配置 systemd 开机自启 → 启动服务。
+
+```bash
+# 方式一：源码在服务器上（已上传或 git clone）
+sudo bash deploy/deploy.sh
+
+# 方式二：从 git 仓库直接拉取源码
+sudo bash deploy/deploy.sh --git https://github.com/zhonggy/outlook-mp.git
+
+# 服务器无本地代理时加 --no-proxy
+sudo bash deploy/deploy.sh --no-proxy
+```
+
+#### 参数说明
+
+| 参数 | 说明 |
+|------|------|
+| `--git <URL>` | 从 git 仓库克隆/拉取源码后再部署 |
+| `--dir /path` | 指定源码目录（默认 `/opt/outlook-manager`） |
+| `--no-proxy` | 关闭 config 中的全局代理（服务器无代理时用） |
+| `--skip-deps` | 跳过 Go/Node 安装（已装好时加速） |
+
+#### 脚本特性
+
+- 自动检测 Go ≥ 1.25 / Node ≥ 20，缺失才安装
+- 幂等可重跑：更新代码后再次执行即可重新构建并重启服务
+- systemd 服务 `Restart=always`，进程异常自动拉起
+- 部署完成后输出访问地址与管理员初始密码
+
+#### 常用命令
+
+```bash
+systemctl status outlook-manager       # 查看状态
+journalctl -u outlook-manager -f       # 跟踪日志
+systemctl restart outlook-manager      # 重启
+```
+
 ### 开发模式
 
 ```bash
@@ -125,6 +164,7 @@ POST /ingest/accounts                自动化上传（X-API-Key 认证）
 ```
 outlook-manager/
 ├── cmd/server/          # 入口（main + 静态资源挂载）
+├── deploy/              # 一键部署脚本（deploy.sh）
 ├── internal/
 │   ├── config/          # 配置加载（yaml + env 覆盖）
 │   ├── model/           # GORM 模型与状态常量
