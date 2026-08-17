@@ -21,11 +21,9 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bin/outlook-manager ./c
 
 # ---- 阶段 3：运行镜像 ----
 FROM alpine:3.20
-RUN apk add --no-cache ca-certificates tzdata && \
-    adduser -D -h /app outlook
+RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
 COPY --from=backend /build/bin/outlook-manager .
-USER outlook
 EXPOSE 18327
 VOLUME ["/app/data", "/app/configs"]
 ENTRYPOINT ["./outlook-manager"]
