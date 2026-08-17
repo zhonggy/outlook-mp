@@ -80,17 +80,40 @@ systemctl restart outlook-manager      # 重启
 ### Docker 部署
 
 ```bash
-# 构建并启动
+# 1. 克隆代码
+cd /opt
+git clone https://github.com/zhonggy/outlook-mp.git
+cd outlook-mp
+
+# 2. 复制配置文件（首次启动自动生成，也可手动复制示例）
+cp configs/config.example.yaml configs/config.yaml
+
+# 3. 构建并启动
 docker compose up -d --build
 
-# 查看日志
-docker logs -f outlook-manager
-
-# 重启
-docker compose restart
+# 4. 查看日志
+sleep 3 && docker logs outlook-manager 2>&1
 ```
 
-首次启动时创建 `configs/` 和 `data/` 目录，参考 `configs/config.example.yaml` 配置。
+首次启动会自动生成管理员密码，查看方式：
+
+```bash
+docker logs outlook-manager 2>&1 | grep -A5 "初始密码"
+# 或查看备份文件
+cat data/initial_admin_password.txt
+```
+
+浏览器访问 `http://服务器IP:18327`。
+
+常用命令：
+
+```bash
+docker compose logs -f     # 跟踪日志
+docker compose restart      # 重启
+docker compose down         # 停止
+```
+
+配置项见 `configs/config.yaml`，环境变量覆盖：`OM_PORT`、`OM_DB_PATH`、`OM_JWT_SECRET`、`OM_ADMIN_PASSWORD`、`OM_PROXY`。
 
 ### 开发模式
 
