@@ -80,18 +80,18 @@ systemctl restart outlook-manager      # 重启
 ### Docker 部署
 
 ```bash
-# 1. 克隆代码
+# 克隆到 /opt/outlook-mp
 cd /opt
 git clone https://github.com/zhonggy/outlook-mp.git
-cd outlook-mp
+cd /opt/outlook-mp
 
-# 2. 复制配置文件（首次启动自动生成，也可手动复制示例）
+# 复制配置
 cp configs/config.example.yaml configs/config.yaml
 
-# 3. 构建并启动
+# 构建并启动
 docker compose up -d --build
 
-# 4. 查看日志
+# 查看日志
 sleep 3 && docker logs outlook-manager 2>&1
 ```
 
